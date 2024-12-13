@@ -1,0 +1,10 @@
+Package: searcher
+Version: 1.0-1
+Architecture: all
+Maintainer: Fatih ÖNDER <fatih@algyazilim.com>
+Installed-Size: 46
+Depends: python3, python3-pyqt5, python3-pillow, python3-pypdf2
+Section: utils
+Priority: optional
+Homepage: https://algyazilim.com
+Description: Bu uygulama, Kullanıcıların bilgisayarlarındaki dosyaları hızlı ve etkili bir şekilde aramasını sağlar. Uygulama, belirli dosya adlarını veya içeriklerini aramak için genişletilmiş arama seçenekleri sunar. Kullanıcılar, arama sonuçlarını dosya adlarına veya içeriklerine göre filtreleyebilir ve sonuçları listeleyebilir. Ayrıca, dosya konumlarını açmak için dosya yöneticilerini kullanarak dosyaları kolayca açabilirler. Kullanıcı dostu arayüzü ve özelleştirilebilir arama seçenekleriyle, Searcher, kullanıcıların dosya yönetimlerini kolaylaştıran bir araçtır.

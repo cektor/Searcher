@@ -1,0 +1,4 @@
+#!/bin/bash
+searcher.py usr/bin/
+searcher.desktop usr/share/applications/
+debian/searcherlo.png /usr/share/icons/hicolor/48x48/apps/
