@@ -2,9 +2,9 @@
 Version=1.0
 Name=Searcher
 Comment=Advanced Search Manager
-Exec=python3 /usr/bin/searcher.py
+Exec=sudo -E env XDG_RUNTIME_DIR=/tmp/runtime-root python3 /usr/bin/searcher.py
 Icon=/usr/share/icons/hicolor/48x48/apps/searcherlo.png
-Terminal=false
+Terminal=true
 Type=Application
 Categories=Utility
 

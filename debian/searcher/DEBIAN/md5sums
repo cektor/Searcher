@@ -1,11 +1,11 @@
 d8986ac7169ae209079d702e8d9c41c3  usr/bin/searcher
-42455b81925dfbd9fecc52b41763b7bc  usr/bin/searcher.py
+2b4657dabc7026ef162b86d0f478ea8d  usr/bin/searcher.py
 0cdb8a54fba5148469b796ccf8e72d12  usr/lib/python3.11/dist-packages/searcher-1.0.egg-info/PKG-INFO
 68b329da9893e34099c7d8ad5cb9c940  usr/lib/python3.11/dist-packages/searcher-1.0.egg-info/dependency_links.txt
 3f92ae2d81a145633c3e6a64e5bb8b95  usr/lib/python3.11/dist-packages/searcher-1.0.egg-info/entry_points.txt
 031e9e16ee833e3e355b520cff11368a  usr/lib/python3.11/dist-packages/searcher-1.0.egg-info/requires.txt
 68b329da9893e34099c7d8ad5cb9c940  usr/lib/python3.11/dist-packages/searcher-1.0.egg-info/top_level.txt
-381bed03247d108250360a52cf9ec1ab  usr/share/applications/searcher.desktop
+0a44d3f859751cddb05af02bb5638bdb  usr/share/applications/searcher.desktop
 1d2498373765737f88bc0f54f4b42c28  usr/share/doc/searcher/changelog.Debian.gz
 74b0e5a663d2b50d91281dee73d9f193  usr/share/doc/searcher/copyright
 e7fded7f1b92a0dcb87659a1fde9a95e  usr/share/icons/hicolor/48x48/apps/searcherlo.png

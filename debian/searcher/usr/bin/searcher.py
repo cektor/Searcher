@@ -8,6 +8,10 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt, QThread, pyqtSignal
 from PyQt5.QtGui import QPixmap, QIcon
+import multiprocessing
+from concurrent.futures import ProcessPoolExecutor
+from functools import lru_cache
+import mmap
 
 def get_resource_path(filename):
     """Kaynak dosyalarının yolunu döndürür."""
@@ -22,6 +26,28 @@ def get_resource_path(filename):
 LOGO_PATH = get_resource_path("searcherlo.png")
 ICON_PATH = get_resource_path("searcherlo.png")
 
+# Sabitler güncelleme
+MOUNT_PATHS = ['/mnt', '/media']  # Bağlı disk yolları
+HOME_DIR = os.path.expanduser('~')
+SKIP_DIRS = {'.git', 'node_modules', '__pycache__', 'venv', '.env'}
+MAX_WORKERS = min(multiprocessing.cpu_count(), 4)
+CHUNK_SIZE = 100
+MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
+
+def get_mounted_paths():
+    """Bağlı disklerin yollarını döndürür"""
+    mounted_paths = set()
+    for mount_point in MOUNT_PATHS:
+        if os.path.exists(mount_point):
+            try:
+                for item in os.listdir(mount_point):
+                    full_path = os.path.join(mount_point, item)
+                    if os.path.ismount(full_path):
+                        mounted_paths.add(full_path)
+            except PermissionError:
+                continue
+    return mounted_paths
+
 class SearchWorker(QThread):
     """Arama işlemlerini arka planda yürüten worker sınıfı"""
     finished = pyqtSignal(list)
@@ -32,24 +58,22 @@ class SearchWorker(QThread):
         super().__init__()
         self.search_query = search_query.lower()  # Aramayı küçük harfe çevir
         self.content_search = content_search
-        self.root_search = root_search
+        self.root_search = root_search  # Bağlı disklerde ara seçeneği
         self.file_format = file_format.lower() if file_format else None
         self.is_running = True
+        self.cpu_count = MAX_WORKERS
 
     def stop(self):
         self.is_running = False
 
     def run(self):
         try:
-            matching_files = []
-            processed_files = 0
+            matching_items = set()
+            processed_items = 0
             
-            # Arama yapılacak dizinleri belirleme
-            search_paths = []
-            
-            # Kök dizini her zaman ekle
-            search_paths.append('/')
-            
+            # Arama yollarını belirle
+            search_paths = [HOME_DIR] if not self.root_search else []
+
             # Bağlı disklerde ara seçili ise
             if self.root_search:
                 # /media dizinindeki bağlı diskleri ekle
@@ -57,104 +81,67 @@ class SearchWorker(QThread):
                     for user in os.listdir('/media'):
                         user_media = os.path.join('/media', user)
                         if os.path.isdir(user_media):
-                            for device in os.listdir(user_media):
-                                device_path = os.path.join(user_media, device)
-                                if os.path.ismount(device_path):
-                                    search_paths.append(device_path)
+                            try:
+                                for device in os.listdir(user_media):
+                                    device_path = os.path.join(user_media, device)
+                                    if os.path.ismount(device_path):
+                                        search_paths.append(device_path)
+                            except PermissionError:
+                                continue
                 
                 # /mnt dizinindeki bağlı diskleri ekle
                 if os.path.exists('/mnt'):
-                    for mount in os.listdir('/mnt'):
-                        mount_path = os.path.join('/mnt', mount)
-                        if os.path.ismount(mount_path):
-                            search_paths.append(mount_path)
+                    try:
+                        for mount in os.listdir('/mnt'):
+                            mount_path = os.path.join('/mnt', mount)
+                            if os.path.ismount(mount_path):
+                                search_paths.append(mount_path)
+                    except PermissionError:
+                        pass
 
-            # Tüm dosyaları tara
-            all_files = []
-            for base_path in search_paths:
-                try:
-                    for root, _, files in os.walk(base_path):
-                        if not self.is_running:
-                            return
-                            
-                        # Sistem dizinlerini atla
-                        if any(skip_dir in root for skip_dir in ['/proc', '/sys', '/run', '/dev']):
-                            continue
+            with ProcessPoolExecutor(max_workers=self.cpu_count) as executor:
+                for base_path in search_paths:
+                    if not self.is_running:
+                        break
                         
-                        for file in files:
-                            try:
-                                file_path = os.path.join(root, file)
-                                
-                                # Sembolik linkleri atla
-                                if os.path.islink(file_path):
-                                    continue
-                                    
-                                # Dosya uzantısı kontrolü
-                                if self.file_format and self.file_format != "dosya uzantısı seçin!":
-                                    if not file_path.lower().endswith(f".{self.file_format}"):
-                                        continue
-                                
-                                # İçerik araması için dosya kontrolü
-                                if self.content_search:
-                                    # Dosya boyutu kontrolü (100MB'dan büyük dosyaları atla)
-                                    try:
-                                        if os.path.getsize(file_path) > 100 * 1024 * 1024:
-                                            continue
-                                    except:
-                                        continue
-                                        
-                                all_files.append(file_path)
-                            except (PermissionError, OSError):
+                    for root, dirs, files in os.walk(base_path, topdown=True):
+                        if not self.is_running:
+                            break
+
+                        # Atlanacak dizinleri filtrele
+                        dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
+                        
+                        # Önce dizinleri ara
+                        for dir_name in dirs:
+                            if self.search_query in dir_name.lower():
+                                matching_items.add(os.path.join(root, dir_name))
+                        
+                        # Dosyaları ara
+                        current_files = []
+                        for name in files:
+                            if self.file_format and not name.lower().endswith(f'.{self.file_format}'):
                                 continue
-                except (PermissionError, OSError):
-                    continue
+                                
+                            full_path = os.path.join(root, name)
+                            
+                            # Dosya adında arama
+                            if self.search_query in name.lower():
+                                matching_items.add(full_path)
+                            # İçerik araması aktifse
+                            elif self.content_search:
+                                current_files.append(full_path)
+                        
+                        # İçerik araması
+                        if self.content_search and current_files:
+                            search_tasks = [(f, self.search_query) for f in current_files]
+                            results = executor.map(search_in_file, search_tasks)
+                            matching_items.update(r for r in results if r)
+                        
+                        processed_items += len(files) + len(dirs)
+                        self.progress.emit(processed_items)
 
-            total_files = len(all_files)
+            self.finished.emit(sorted(matching_items))
 
-            # Dosyaları ara
-            for file_path in all_files:
-                if not self.is_running:
-                    return
-
-                try:
-                    file_name = os.path.basename(file_path).lower()
-                    
-                    # Dosya adında arama
-                    if not self.content_search and self.search_query in file_name:
-                        matching_files.append(file_path)
-                    
-                    # İçerik araması
-                    elif self.content_search:
-                        try:
-                            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                                try:
-                                    # Önce ilk birkaç baytı kontrol et (binary dosya kontrolü)
-                                    start = f.read(1024)
-                                    if '\0' in start:
-                                        continue
-                                    
-                                    # Dosyanın başına dön
-                                    f.seek(0)
-                                    
-                                    # Satır satır oku
-                                    for line in f:
-                                        if self.search_query in line.lower():
-                                            matching_files.append(file_path)
-                                            break
-                                except UnicodeDecodeError:
-                                    continue
-                        except (PermissionError, IOError):
-                            continue
-
-                    processed_files += 1
-                    progress = int((processed_files / total_files) * 100)
-                    self.progress.emit(progress)
-
-                except Exception as e:
-                    continue
-
-            self.finished.emit(sorted(set(matching_files)))
-            
         except Exception as e:
             self.error.emit(str(e))
 
@@ -166,6 +153,19 @@ class SearchWorker(QThread):
                 return b'\0' in chunk  # Null bayt varsa binary dosyadır
         except:
             return True
+
+def search_in_file(args):
+    file_path, search_query = args
+    try:
+        if os.path.getsize(file_path) > MAX_FILE_SIZE:
+            return None
+        with open(file_path, 'r', encoding='utf-8') as f:
+            content = f.read().lower()
+            if search_query in content:
+                return file_path
+    except:
+        pass
+    return None
 
 class AboutDialog(QDialog):
     def __init__(self, parent=None):
