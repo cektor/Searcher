@@ -12,6 +12,7 @@ setup(
         'PyQt5>=5.15.0',  # PyQt5 bağımlılığı (versiyon sınırı belirtilmiş)
         'Pillow>=8.0.0',  # Pillow bağımlılığı (versiyon sınırı belirtilmiş)
         'PyPDF2>=1.26.0',  # PyPDF2 bağımlılığı (versiyon sınırı belirtilmiş)
+        'psutil>=5.8.0',  # psutil bağımlılığı eklendi
     ],
     package_data={
         'searcher': ['*.png', '*.desktop'],  # 'searcher' paketine dahil dosyalar
@@ -26,3 +27,4 @@ setup(
         ]
     },
 )
+
